@@ -92,6 +92,7 @@ int main() {
         analyse_memory();
     } else {
         std::cout << "[JOCKY] System nominal" << std::endl;
+        std::cout << "This is the added thing" << std::endl;
     }
 
     transmit_results();
