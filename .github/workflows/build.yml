@@ -1,0 +1,139 @@
+name: JOCKY Polymorphic Build Pipeline
+
+# -------------------------------------------------------
+# Trigger: runs automatically on every push
+# -------------------------------------------------------
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch: # also allows manual trigger from GitHub UI
+
+jobs:
+  build:
+    name: Obfuscate → Compile → Hash → Upload
+    runs-on: ubuntu-latest # GitHub spins up a fresh Ubuntu machine
+
+    steps:
+      # -------------------------------------------------------
+      # Step 1: Download your repository onto the runner
+      # -------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -------------------------------------------------------
+      # Step 2: Install Python (for obfuscator)
+      # -------------------------------------------------------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # -------------------------------------------------------
+      # Step 3: Install GCC C++ compiler
+      # -------------------------------------------------------
+      - name: Install GCC
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y g++ mingw-w64
+          echo "GCC version:"
+          g++ --version
+
+      # -------------------------------------------------------
+      # Step 4: Run the polymorphic obfuscation engine
+      # Reads:  mission.cpp
+      # Writes: mission_obfuscated.cpp
+      # -------------------------------------------------------
+      - name: Run Obfuscation Engine
+        run: |
+          echo "Running JOCKY Polymorphic Obfuscation Engine..."
+          python obfuscate.py
+
+      # -------------------------------------------------------
+      # Step 5: Show the obfuscated file (for demo visibility)
+      # -------------------------------------------------------
+      - name: Show obfuscated output (first 40 lines)
+        run: |
+          echo "===== Obfuscated Source Preview ====="
+          head -40 mission_obfuscated.cpp
+
+      # -------------------------------------------------------
+      # Step 6: Compile the obfuscated source
+      # Produces: mission (Linux binary)
+      # For Windows cross-compile: use x86_64-w64-mingw32-g++
+      # -------------------------------------------------------
+      - name: Compile Obfuscated Source (Linux)
+        run: |
+          echo "Compiling for Linux..."
+          g++ mission_obfuscated.cpp -o mission -std=c++17
+          echo "Linux binary produced: mission"
+
+      - name: Compile Obfuscated Source (Windows .exe)
+        run: |
+          echo "Compiling for Windows..."
+          x86_64-w64-mingw32-g++ mission_obfuscated.cpp \
+            -o mission.exe \
+            -std=c++17 \
+            -static
+          echo "Windows binary produced: mission.exe"
+
+      # -------------------------------------------------------
+      # Step 7: Compute and display SHA256 hashes
+      # This is the key demo proof — different every build
+      # -------------------------------------------------------
+      - name: Compute Binary Hashes
+        run: |
+          echo "===== BINARY HASHES ====="
+          echo "Linux binary:"
+          sha256sum mission
+          echo ""
+          echo "Windows binary:"
+          sha256sum mission.exe
+          echo "========================="
+
+      # -------------------------------------------------------
+      # Step 8: Run the Linux binary to verify it works
+      # -------------------------------------------------------
+      - name: Verify Binary Runs
+        run: |
+          echo "===== BINARY OUTPUT ====="
+          chmod +x mission
+          ./mission
+          echo "========================="
+
+      # -------------------------------------------------------
+      # Step 9: Upload both binaries as downloadable artifacts
+      # You download these from the GitHub Actions tab
+      # -------------------------------------------------------
+      - name: Upload Linux Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: mission-linux-${{ github.run_number }}
+          path: mission
+          retention-days: 7
+
+      - name: Upload Windows Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: mission-windows-${{ github.run_number }}
+          path: mission.exe
+          retention-days: 7
+
+      # -------------------------------------------------------
+      # Step 10: Print build summary
+      # -------------------------------------------------------
+      - name: Build Summary
+        run: |
+          echo "===== JOCKY BUILD COMPLETE ====="
+          echo "Run number    : ${{ github.run_number }}"
+          echo "Commit SHA    : ${{ github.sha }}"
+          echo "Triggered by  : ${{ github.actor }}"
+          echo ""
+          echo "Linux  hash:"
+          sha256sum mission  | awk '{print $1}'
+          echo ""
+          echo "Windows hash:"
+          sha256sum mission.exe | awk '{print $1}'
+          echo ""
+          echo "Every build produces a unique hash."
+          echo "Same source. Different binary. Every time."
+          echo "================================"
