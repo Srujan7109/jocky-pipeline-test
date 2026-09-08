@@ -118,6 +118,13 @@ jobs:
           path: mission.exe
           retention-days: 7
 
+      - name: Upload Obfuscated Source
+        uses: actions/upload-artifact@v4
+        with:
+          name: obfuscated-source-${{ github.run_number }}
+          path: mission_obfuscated.cpp
+          retention-days: 7
+
       # -------------------------------------------------------
       # Step 10: Print build summary
       # -------------------------------------------------------
